@@ -7,7 +7,6 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
-using ZeroXStats.models;
 
 namespace ZeroXStats
 {
@@ -25,7 +24,7 @@ namespace ZeroXStats
                 {
                     case "init":
                         var config = LoadConfig();
-                        stats.Initialize(config.Hostname);
+                        stats.Initialize(config["baseUrl"]);
                         output.Append("STARTED");
                         break;
                     case "shutdown":
@@ -44,12 +43,12 @@ namespace ZeroXStats
             }
         }
 
-        private static Config LoadConfig()
+        private static IDictionary<string, string> LoadConfig()
         {
             using (StreamReader reader = new StreamReader("ZeroXStats.json"))
             {
                 string config = reader.ReadToEnd();
-                return JsonConvert.DeserializeObject<Config>(config);
+                return JsonConvert.DeserializeObject<Dictionary<string, string>>(config);
             }
         }
     }

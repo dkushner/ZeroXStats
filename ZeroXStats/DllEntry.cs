@@ -1,4 +1,5 @@
 ﻿using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using RGiesecke.DllExport;
 using System;
 using System.Collections.Generic;
@@ -23,6 +24,7 @@ namespace ZeroXStats
                 switch (signature.First())
                 {
                     case "init":
+                        Console.WriteLine("Initializing stats extension...");
                         var config = LoadConfig();
                         stats.Initialize(config["baseUrl"]);
                         output.Append("STARTED");
@@ -32,7 +34,8 @@ namespace ZeroXStats
                         output.Append("STOPPED");
                         break;
                     default:
-                        stats.Write(signature.First(), signature.Last());
+                        Console.WriteLine("Handling: " + input);
+                        stats.Write(signature.First(), JObject.Parse(signature.Last()));
                         output.Append("OK");
                         break;
                 }

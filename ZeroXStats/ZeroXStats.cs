@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Newtonsoft.Json.Linq;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -22,9 +23,9 @@ namespace ZeroXStats
             while (!thread.IsAlive) { }
         }
 
-        public void Write(string type, string blob)
+        public void Write(string type, JObject item)
         {
-            worker.Write(type, blob);
+            worker.Write(type, item);
         }
 
         public void Shutdown()

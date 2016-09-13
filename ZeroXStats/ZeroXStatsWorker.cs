@@ -13,16 +13,26 @@ namespace ZeroXStats
 {
     public class ZeroXStatsWorker
     {
+        private static Dictionary<string, string> endpoints = new Dictionary<string, string>()
+        {
+            { "operation", "api/operations" },
+            { "hit", "api/hits" }
+        };
+
         private volatile bool stop = false;
-        private ConcurrentDictionary<string, Queue<JObject>> pending;
+        private ConcurrentQueue<KeyValuePair<string, JObject>> pending;
         private WebClient client;
 
         public ZeroXStatsWorker(string baseUrl)
         {
-            this.pending = new ConcurrentDictionary<string, Queue<JObject>>();
+            this.pending = new ConcurrentQueue<KeyValuePair<string, JObject>>();
             this.client = new WebClient()
             {
-                BaseAddress = baseUrl
+                BaseAddress = baseUrl,
+                Headers = new WebHeaderCollection()
+                {
+                    { "Accept", "application/vnd.api+json" }
+                }
             };
         }
 
@@ -31,24 +41,52 @@ namespace ZeroXStats
             while (!stop)
             {
                 Thread.Sleep(100);
-                foreach (var entry in pending)
+                while (!pending.IsEmpty)
                 {
-                    var endpoint = new Uri(entry.Key);
-                    var collection = entry.Value;
-                    foreach (var item in collection)
+                    KeyValuePair<string, JObject> entry;
+                    if (pending.TryDequeue(out entry))
                     {
-                        client.UploadString(endpoint, JsonConvert.SerializeObject(item));
+                        try
+                        {
+                            client.UploadString(endpoints[entry.Key], JsonConvert.SerializeObject(entry.Value));
+                        }
+                        catch (WebException e)
+                        {
+                            Console.WriteLine(e.ToString());
+                        }
                     }
                 }
             }
         }
 
-        public void Write(string type, string item)
+        public void Write(string type, JObject item)
         {
-            // Endpoints are pluralized.
-            var collection = type.ToLower() + "s";
-            var parsed = JObject.Parse(item);
-            pending.GetOrAdd(collection, new Queue<JObject>()).Enqueue(parsed);
+            // Hack in an accurate timestamp because SQF is awful.
+            if ("operation".Equals(type))
+            {
+                Console.WriteLine("Sending operation info.");
+                var settings = new JsonSerializerSettings()
+                {
+                    DateFormatHandling = DateFormatHandling.IsoDateFormat,
+                    StringEscapeHandling = StringEscapeHandling.EscapeHtml
+                };
+
+                var timestamp = DateTime.UtcNow.ToString("o");
+                item.Add("started", timestamp);
+            }
+
+            // Bundle everything up into JSON-API format.
+            var root = new JObject()
+            {
+                {
+                    "data", new JObject()
+                    {
+                        { "type", type + "s" },
+                        { "attributes", item }
+                    }
+                }
+            };
+            pending.Enqueue(new KeyValuePair<string, JObject>(type, root));
         }
 
         public void Stop()
